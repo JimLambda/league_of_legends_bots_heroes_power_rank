@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------
+#  LoL Bot Heroes Power Rank — dependencies
+#  Python 3.9 - 3.12 recommended (paddlepaddle has no wheels for 3.13+)
+# ---------------------------------------------------------------
+
+# --- UI & data ---
+streamlit>=1.49.0
+pandas>=2.0.0
+plotly>=5.18.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# --- OCR engines (install at least one) ---
+# PaddleOCR: default, most accurate, offline (~500 MB with paddlepaddle)
+paddleocr>=2.7.0,<2.9.0
+paddlepaddle>=2.5.0,<3.0.0
+
+# RapidOCR: lightweight fallback (~15 MB of ONNX models, downloaded once)
+rapidocr-onnxruntime>=1.3.2
