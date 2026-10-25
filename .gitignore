@@ -1,3 +1,6 @@
+# Python virtual environment
+.venv/
+
 # Image files
 *.jpg
 *.jpeg
@@ -8,3 +11,6 @@
 *.ico
 *.webp
 *.tiff
+
+# Database files
+*.db
