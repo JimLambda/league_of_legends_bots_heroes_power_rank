@@ -61,8 +61,42 @@ def _unpack_line(line: Sequence) -> Optional[tuple]:
     return points, text, score
 
 
+def _is_point(pt) -> bool:
+    """A polygon vertex ``[x, y]`` (also accepts numpy arrays)."""
+    try:
+        return (len(pt) >= 2
+                and isinstance(float(pt[0]), float)
+                and isinstance(float(pt[1]), float))
+    except (TypeError, ValueError, IndexError):
+        return False
+
+
+def _is_line(candidate) -> bool:
+    """A PaddleOCR line is ``[polygon, text]`` or ``[polygon, (text, score)]``.
+
+    ``polygon`` is a list of >=3 points; the second element is text-like
+    (a string, or a ``(string, score)`` tuple) — *not* yet another line.
+    """
+    if not isinstance(candidate, (list, tuple)) or len(candidate) < 2:
+        return False
+    poly = candidate[0]
+    if not isinstance(poly, (list, tuple)) or len(poly) < 3:
+        return False
+    if not _is_point(poly[0]):
+        return False
+    second = candidate[1]
+    if isinstance(second, (list, tuple)):          # (text, score) tuple
+        return isinstance(second[0], str)
+    return isinstance(second, str)
+
+
 def _flatten_paddle(result) -> List[Sequence]:
-    """Handle old (``[[line, …]]``), new (``[line, …]``) and dict results."""
+    """Normalise every PaddleOCR output shape to a flat list of lines.
+
+    PaddleOCR 2.8 ``ocr()`` returns ``[[line, …]]`` (one element per image);
+    3.x ``predict()`` may return dicts.  Each line is
+    ``[polygon, (text, score)]`` (or ``[polygon, text]``).
+    """
     if result is None:
         return []
     if isinstance(result, dict):                       # 3.x predict() style
@@ -76,20 +110,16 @@ def _flatten_paddle(result) -> List[Sequence]:
             return [[list(p), t, s] for p, t, s in zip(polygons, texts, scores)]
         return []
     if isinstance(result, (list, tuple)):
-        if len(result) == 0:
+        if not result:
             return []
-        first = result[0]
-        if isinstance(first, dict):
-            lines: List[Sequence] = []
-            for item in result:
-                lines.extend(_flatten_paddle(item))
-            return lines
-        if (isinstance(first, (list, tuple)) and len(first) > 1
-                and isinstance(first[0], (list, tuple))
-                and len(first[0]) == 2
-                and isinstance(first[0][0], (int, float))):
-            return list(result)                        # already a line list
-        return _flatten_paddle(first)                  # nested per image
+        if _is_line(result):                          # the result itself is one line
+            return [list(result)]
+        if _is_line(result[0]):                       # a list of lines
+            return list(result)
+        lines: List[Sequence] = []                    # nested per-image wrapper
+        for item in result:
+            lines.extend(_flatten_paddle(item))
+        return lines
     return []
 
 

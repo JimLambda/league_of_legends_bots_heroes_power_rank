@@ -22,6 +22,35 @@ from botrank.storage import Store  # noqa: E402
 IMG_W, IMG_H = 1920, 1080
 
 
+class TestPaddleOutputFlattening(unittest.TestCase):
+    """PaddleOCR 2.8 returns ``[[line, …]]`` — the old flattener dropped all
+    but the first line, producing 0 scoreboard rows. Regression coverage."""
+
+    def _line(self, label, x=100, y=100):
+        poly = [[x, y], [x + 50, y], [x + 50, y + 20], [x, y + 20]]
+        return [poly, (label, 0.95)]
+
+    def test_flatten_double_wrapped_2_8(self):
+        from botrank.ocr import _flatten_paddle
+        # PaddleOCR 2.8.1: one outer list (per image) of lines
+        result = [[self._line("A"), self._line("B"), self._line("C")]]
+        lines = _flatten_paddle(result)
+        self.assertEqual([l[1][0] for l in lines], ["A", "B", "C"])
+
+    def test_flatten_flat_list(self):
+        from botrank.ocr import _flatten_paddle
+        # some builds return the line list directly
+        result = [self._line("A"), self._line("B")]
+        lines = _flatten_paddle(result)
+        self.assertEqual([l[1][0] for l in lines], ["A", "B"])
+
+    def test_flatten_is_line_detects_line_not_list(self):
+        from botrank.ocr import _is_line
+        self.assertTrue(_is_line(self._line("A")))
+        # a list of lines must NOT be mistaken for a line
+        self.assertFalse(_is_line([self._line("A"), self._line("B")]))
+
+
 class TestFlatBoxGeometry(unittest.TestCase):
     """PaddleOCR can hand back a flat 8-element box polygon instead of 4 points.
 

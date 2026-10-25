@@ -1,6 +1,13 @@
 # Python virtual environment
 .venv/
 
+# Python bytecode and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
 # Image files
 *.jpg
 *.jpeg
@@ -17,3 +24,4 @@
 
 # Python compile files
 *.pyc
+botrank/__pycache__/
