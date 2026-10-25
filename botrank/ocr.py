@@ -20,8 +20,20 @@ from .parser import Box, ParsedMatch, parse_scoreboard
 
 
 def _box_from_points(points, text: str, score: float) -> Box:
-    xs = [float(p[0]) for p in points]
-    ys = [float(p[1]) for p in points]
+    """Build a :class:`Box` from a polygon.
+
+    PaddleOCR / RapidOCR usually return the polygon as 4 ``[x, y]`` points,
+    but some builds flatten it to a single 8-element ``[x1,y1,…,x4,y4]`` list.
+    Both shapes are accepted.
+    """
+    try:
+        xs = [float(p[0]) for p in points]
+        ys = [float(p[1]) for p in points]
+    except (TypeError, IndexError):                 # flat [x1,y1,…,x4,y4]
+        flat = [float(v) for v in points]
+        pts = [(flat[i], flat[i + 1]) for i in range(0, len(flat), 2)]
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
     return Box(min(xs), min(ys), max(xs), max(ys), str(text).strip(),
                float(score))
 
@@ -85,9 +97,13 @@ def boxes_from_paddle(result) -> List[Box]:
     boxes: List[Box] = []
     for line in _flatten_paddle(result):
         unpacked = _unpack_line(line)
-        if unpacked:
-            points, text, score = unpacked
+        if not unpacked:
+            continue
+        points, text, score = unpacked
+        try:
             boxes.append(_box_from_points(points, text, score))
+        except (TypeError, IndexError, ValueError):
+            continue
     return boxes
 
 
@@ -99,9 +115,13 @@ def boxes_from_rapid(result) -> List[Box]:
     boxes: List[Box] = []
     for line in lines or []:
         unpacked = _unpack_line(line)
-        if unpacked:
-            points, text, score = unpacked
+        if not unpacked:
+            continue
+        points, text, score = unpacked
+        try:
             boxes.append(_box_from_points(points, text, score))
+        except (TypeError, IndexError, ValueError):
+            continue
     return boxes
 
 

@@ -22,6 +22,59 @@ from botrank.storage import Store  # noqa: E402
 IMG_W, IMG_H = 1920, 1080
 
 
+class TestFlatBoxGeometry(unittest.TestCase):
+    """PaddleOCR can hand back a flat 8-element box polygon instead of 4 points.
+
+    Regression for: "'float' object is not subscriptable".
+    """
+
+    def test_box_from_flat_polygon(self):
+        from botrank.ocr import _box_from_points
+        # flat [x1,y1,x2,y2,x3,y3,x4,y4]
+        box = _box_from_points([100, 200, 300, 200, 300, 230, 100, 230], "X", 0.9)
+        self.assertEqual((box.x1, box.y1, box.x2, box.y2), (100, 200, 300, 230))
+        self.assertEqual(box.text, "X")
+        self.assertEqual(box.score, 0.9)
+
+    def test_boxes_from_paddle_flat(self):
+        from botrank.ocr import boxes_from_paddle
+        # PaddleOCR 3.x predict() returns a list of dicts; polygons can be
+        # flat 8-element lists [x1,y1,…,x4,y4] instead of 4 [x,y] points.
+        result = [{"dt_polys": [[100, 200, 300, 200, 300, 230, 100, 230]],
+                   "rec_texts": ["Veigar"], "rec_scores": [0.95]},
+                  {"dt_polys": [[400, 200, 500, 200, 500, 230, 400, 230]],
+                   "rec_texts": ["Sejuani"], "rec_scores": [0.91]}]
+        boxes = boxes_from_paddle(result)
+        self.assertEqual(len(boxes), 2)
+        self.assertEqual(boxes[0].text, "Veigar")
+        self.assertEqual((boxes[0].x1, boxes[0].y2), (100, 230))
+
+    def test_parse_tolerates_flat_boxes(self):
+        from botrank.ocr import boxes_from_paddle
+        result = [
+            {"dt_polys": [[80, 30, 200, 30, 200, 80, 80, 80]],
+             "rec_texts": ["胜利"], "rec_scores": [0.99]},
+            {"dt_polys": [[700, 160, 800, 160, 800, 190, 700, 190]],
+             "rec_texts": ["5/12/16"], "rec_scores": [0.98]},
+            {"dt_polys": [[150, 150, 300, 150, 300, 200, 150, 200]],
+             "rec_texts": ["Veigar"], "rec_scores": [0.97]},
+            {"dt_polys": [[830, 160, 930, 160, 930, 190, 830, 190]],
+             "rec_texts": ["32,637"], "rec_scores": [0.96]},
+            {"dt_polys": [[920, 160, 1020, 160, 1020, 190, 920, 190]],
+             "rec_texts": ["13,565"], "rec_scores": [0.96]},
+        ]
+        match = parse_scoreboard(
+            boxes_from_paddle(result), IMG_W, IMG_H, ChampionDB.load())
+        self.assertEqual(len(match.players), 1)
+        self.assertEqual(match.players[0].name, "Veigar")
+        self.assertEqual(match.players[0].kills, 5)
+        self.assertEqual(match.players[0].damage, 32637)
+        self.assertEqual(match.players[0].gold, 13565)
+        self.assertEqual(match.team1_outcome, "VICTORY")
+
+
+
+
 # --------------------------------------------------------------------------- #
 # synthetic scoreboard builder (mirrors the real post-game layout)
 # --------------------------------------------------------------------------- #
